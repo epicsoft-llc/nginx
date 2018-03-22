@@ -11,7 +11,7 @@ There is no versioning of this project, the current versions of `alpine` and `st
 
 If you need a different version, you may copy and modify my templates as needed.
 
-`alpine` `stable-alpine` [Dockerfile]() ToDo Link
+`alpine` `stable-alpine` [Dockerfile](https://gitlab.com/epicdocker/nginx/blob/master/Dockerfile) ToDo Link
 
 
 ## Requirements
@@ -53,4 +53,4 @@ The command to execute, if any of the submitted files changes.
 
 ## License
 
-MIT License see [LICENSE]() ToDo Link
+MIT License see [LICENSE](https://gitlab.com/epicdocker/nginx/blob/master/LICENSE) ToDo Link
