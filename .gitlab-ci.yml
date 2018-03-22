@@ -1,0 +1,60 @@
+image: docker:latest
+
+services:
+  - docker:dind
+
+stages:
+  - build
+  - release
+  - dockerhub
+  - quayio
+
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+
+Build:
+  stage: build
+  script:
+    - docker info
+    - export VERSION=$CI_COMMIT_REF_NAME
+    - echo "running with version '$VERSION'"
+    - docker build --pull -t $CI_REGISTRY_IMAGE:$VERSION .
+    - docker push $CI_REGISTRY_IMAGE:$VERSION
+
+Release:
+  stage: release
+  script:    
+    - docker build --pull -t $CI_REGISTRY_IMAGE:alpine --build-arg VERSION=alpine .
+    - docker push $CI_REGISTRY_IMAGE:alpine
+    - docker build --pull -t $CI_REGISTRY_IMAGE:stable-alpine --build-arg VERSION=stable-alpine .
+    - docker push $CI_REGISTRY_IMAGE:stable-alpine
+  only:
+    - master
+
+DockerHub:
+  stage: dockerhub
+  script:
+    - export DOCKER_HUB_IMAGE="epicsoft/nginx"
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASS
+    - docker pull $CI_REGISTRY_IMAGE:alpine
+    - docker tag $CI_REGISTRY_IMAGE:alpine $DOCKER_HUB_IMAGE:alpine
+    - docker push $DOCKER_HUB_IMAGE:alpine
+    - docker pull $CI_REGISTRY_IMAGE:stable-alpine
+    - docker tag $CI_REGISTRY_IMAGE:stable-alpine $DOCKER_HUB_IMAGE:stable-alpine
+    - docker push $DOCKER_HUB_IMAGE:stable-alpine
+  only:
+    - master
+
+QuayIO:
+  stage: quayio
+  script:
+    - export QUAY_IO_IMAGE="quay.io/epicsoft/nginx"
+    - docker login -u="$QUAY_IO_USER" -p="$QUAY_IO_PASS" quay.io
+    - docker pull $CI_REGISTRY_IMAGE:alpine
+    - docker tag $CI_REGISTRY_IMAGE:alpine $QUAY_IO_IMAGE:alpine
+    - docker push $QUAY_IO_IMAGE:alpine
+    - docker pull $CI_REGISTRY_IMAGE:stable-alpine
+    - docker tag $CI_REGISTRY_IMAGE:stable-alpine $QUAY_IO_IMAGE:stable-alpine
+    - docker push $QUAY_IO_IMAGE:stable-alpine
+  only:
+    - master
