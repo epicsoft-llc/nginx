@@ -1,6 +1,6 @@
 ARG VERSION=alpine
 FROM nginx:$VERSION
-LABEL image.name="nginx" \
+LABEL image.name="epicsoft-nginx" \
       image.description="Nginx with automatic reload on file/configuration change" \
       maintainer="epicsoft.de" \
       maintainer.name="Alexander Schwarz <schwarz@epicsoft.de>" \
