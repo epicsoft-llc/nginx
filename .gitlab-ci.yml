@@ -6,8 +6,6 @@ services:
 stages:
   - build
   - release
-  - dockerhub
-  - quayio
 
 before_script:
   - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
@@ -21,7 +19,7 @@ Build:
     - docker build --pull -t $CI_REGISTRY_IMAGE:$VERSION .
     - docker push $CI_REGISTRY_IMAGE:$VERSION
 
-Release:
+GitLab:
   stage: release
   script:
     - docker build --pull -t $CI_REGISTRY_IMAGE:stable-alpine --build-arg VERSION=stable-alpine .
@@ -34,7 +32,7 @@ Release:
     - master
 
 DockerHub:
-  stage: dockerhub
+  stage: release
   script:
     - export DOCKER_HUB_IMAGE="epicsoft/nginx"
     - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASS
@@ -50,7 +48,7 @@ DockerHub:
     - master
 
 QuayIO:
-  stage: quayio
+  stage: release
   script:
     - export QUAY_IO_IMAGE="quay.io/epicsoft/nginx"
     - docker login -u="$QUAY_IO_USER" -p="$QUAY_IO_PASS" quay.io
