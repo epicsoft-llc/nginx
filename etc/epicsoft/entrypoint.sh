@@ -2,7 +2,10 @@
 
 set -e
 
+#### Custom Log format
+bash /etc/epicsoft/logformat.sh
+
 #### Start observer as a background process
-/bin/bash /etc/epicsoft/observer.sh &
+bash /etc/epicsoft/observer.sh &
 
 exec "$@"

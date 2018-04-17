@@ -2,6 +2,9 @@
 * 1. [Versions](#Versions)
 * 2. [Requirements](#Requirements)
 * 3. [Examples](#Examples)
+	* 3.1. [Change configuration file](#Changeconfigurationfile)
+	* 3.2. [Custom log format](#Customlogformat)
+	* 3.3. [Log format for 'proxy_protocol'](#Logformatforproxy_protocol)
 * 4. [Environments](#Environments)
 * 5. [Links](#Links)
 * 6. [License](#License)
@@ -18,6 +21,8 @@
 Nginx with automatic reload on file/configuration change.
 
 The image extends the official [nginx](https://hub.docker.com/_/nginx/) image by a bash-script that detects changes based on the checksum and thus provides a way to reload nginx without restarting the conteiner or service.
+
+The image offers the possibility to change the standard logging format and thus to choose a user-defined format, e.g. to access other variables when using the proxy protocol. This overwrites the default parameter `access_log` and uses the custom logging format.
 
 The information about changes to files is not passed on to the container by the host, therefore checksums are created by the files and checked for changes in the interval. In case of a faulty nginx configuration, the application and the bash-script will continue, so that the error can be corrected without container restart.
 
@@ -38,6 +43,9 @@ If you need a different version, you may copy and modify my templates as needed.
 
 ##  3. <a name='Examples'></a>Examples
 
+
+###  3.1. <a name='Changeconfigurationfile'></a>Change configuration file 
+
 Create your own configuration or copy it from the existing docker image.
 
     mkdir -p /tmp/nginx
@@ -45,10 +53,41 @@ Create your own configuration or copy it from the existing docker image.
 
 Start the container and mount your configuration from the host. In this example, the container blocks the terminal and displays the log.
 
-    docker run --rm -it -v /tmp/nginx:/etc/nginx/conf.d:ro -p 80:80 --name nginx registry.gitlab.com/epicdocker/nginx:latest
+    docker run --rm -it --name nginx \
+	  -v /tmp/nginx:/etc/nginx/conf.d:ro \
+	  -p 80:80 \
+	  registry.gitlab.com/epicdocker/nginx:latest
 
 Now you can reach the nginx service with a browser on the port `80`. In a second terminal you can now change the configuration file `/tmp/nginx/default.conf` and in the log (first terminal) within a few seconds the modified file `/etc/nginx/conf.d/default.conf` and the command `nginx -s reload` to be executed should be displayed, as well as the message from the nginx itself `signal process started`.
 
+
+###  3.2. <a name='Customlogformat'></a>Custom log format 
+
+Start the Docker container with activated and user-defined logging format.
+
+    docker run --rm -it --name nginx \
+	  -e NGINX_CUSTOM_LOGFORMAT_ENABLE=true \
+	  -e NGINX_CUSTOM_LOGFORMAT='Example log format - $remote_addr - $remote_user [$time_local] "$request"' \
+	  -p 80:80 \
+	  registry.gitlab.com/epicdocker/nginx:latest
+
+In the browser, go to the page `http://localhost/` and reload a few times, e.g. with pressing `F5`. Then the logs in the user-defined format can be seen in the console.
+
+    [INFO] 2018-04-17T15:04:38+0000 Custom log format enabled
+    [INFO] 2018-04-17T15:04:38+0000 Starting observation for files '/etc/nginx/conf.d/default.conf' with command 'nginx -s reload'
+    Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:43 +0000] "GET / HTTP/1.1"
+    Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:44 +0000] "GET / HTTP/1.1"
+    Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:45 +0000] "GET / HTTP/1.1"
+
+Stop the container by pressing `Ctrl + C`.
+
+
+###  3.3. <a name='Logformatforproxy_protocol'></a>Log format for 'proxy_protocol'
+
+The following format can be used for the proxy protocol. Logging format taken from the [nginx documentation](https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol/).
+
+    NGINX_CUSTOM_LOGFORMAT='$proxy_protocol_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
+	
 
 ##  4. <a name='Environments'></a>Environments
 
@@ -75,6 +114,30 @@ The command to execute, if any of the submitted files changes.
 *default:* 10
 
 Interval in seconds, in which the changes are checked.
+
+`NGINX_CUSTOM_LOGFORMAT_ENABLE`
+
+*default:* false
+
+General switch on (`true`) or off (`false`) the user-defined logging format functionality.
+
+`NGINX_CUSTOM_LOGFORMAT`
+
+*default:* `'Custom log format - $remote_addr - $remote_user [$time_local] "$request"'`
+
+The content of the nginx logging format. 
+
+`NGINX_CUSTOM_LOGFORMAT_NAME`
+
+*default:* custom
+
+Name given to the logging format. `main` is already reserved and must not be used.
+
+`EPICSOFT_LOG_LEVEL_DEBUG`
+
+*default:* false
+
+Toggles the debug message from epicsoft scripts on (`true`) or off (`false`).
 
 
 ##  5. <a name='Links'></a>Links
