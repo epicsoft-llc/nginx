@@ -13,9 +13,4 @@ if [[ $NGINX_CUSTOM_LOGFORMAT_ENABLE == true ]]; then
   fi
 
   sed -i.bak -e "s#access_log\s\{1,\}$CUSTOM_NGINX_LOG_FILE\s\{1,\}main\s\{0,\};#$CUSTOM_NGINX_LOG_FORMAT\n\n    access_log $CUSTOM_NGINX_LOG_FILE $NGINX_CUSTOM_LOGFORMAT_NAME;#g" $CUSTOM_NGINX_CONFIG_FILE
-
-  if [[ $EPICSOFT_LOG_LEVEL_DEBUG == true ]]; then
-    echo "[DEBUG] $(date -Iseconds) Print nginx configuration file: $CUSTOM_NGINX_CONFIG_FILE"
-    cat $CUSTOM_NGINX_CONFIG_FILE
-  fi
 fi

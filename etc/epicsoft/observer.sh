@@ -11,7 +11,7 @@ function readChecksum(){
   done
 }
 
-if [[ "$(echo "$OBSERVE_FILES")" != '' && "$(echo "$OBSERVE_COMMAND")" != '' ]]; then
+if [[ $OBSERVE_FILES_ENABLE == true && "$(echo "$OBSERVE_FILES")" != '' && "$(echo "$OBSERVE_COMMAND")" != '' ]]; then
   if [[ $OBSERVE_FILES_CREATE == true ]]; then   
     for FILE in $OBSERVE_FILES ; do
       if [[ ! -f $FILE && ! -d $FILE ]]; then

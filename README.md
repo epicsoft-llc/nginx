@@ -91,6 +91,12 @@ The following format can be used for the proxy protocol. Logging format taken fr
 
 ##  4. <a name='Environments'></a>Environments
 
+`OBSERVE_FILES_ENABLE`
+
+*default:* true
+
+Enables (`true`) or disables (`false`) the monitoring of files. In combination with `NGINX_CUSTOM_DELETE_DEFAULT_CONF`, it should probably be turned off unless other file is to be monitored.
+
 `OBSERVE_FILES`
 
 *default:* /etc/nginx/conf.d/default.conf
@@ -132,6 +138,24 @@ The content of the nginx logging format.
 *default:* custom
 
 Name given to the logging format. `main` is already reserved and must not be used.
+
+`NGINX_CUSTOM_ADD_SERVER_TOKENS_OFF`
+
+*default:* false
+
+Prevents sending the nginx version number in response. Adds the parameter `server_tokens off` to the nginx configuration directly in the HTTP context at the highest configuration level. This is valid for all website configurations. 
+
+`NGINX_CUSTOM_ADD_DIRECT_INCLUDE`
+
+*default:* false
+
+Adds an additional include path to the configuration `/etc/nginx/inc.d/`, which is outside the HTTP context. This setting is required if you want to configure stream(s), as they can not be included in the HTTP context. The configuration file must have the suffix `.conf` to be included.
+
+`NGINX_CUSTOM_DELETE_DEFAULT_CONF`
+
+*default:* false
+
+Deletes the default web page configuration file `/etc/nginx/conf.d/default.conf`. This setting is mainly needed if you use only the alternate include path of configuration file, see `NGINX_CUSTOM_ADD_DIRECT_INCLUDE`. If no custom file is being monitored, `OBSERVE_FILES_ENABLE` should be disabled.
 
 `EPICSOFT_LOG_LEVEL_DEBUG`
 
