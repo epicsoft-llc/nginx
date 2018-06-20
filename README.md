@@ -58,7 +58,7 @@ Start the container and mount your configuration from the host. In this example,
 	  -p 80:80 \
 	  registry.gitlab.com/epicdocker/nginx:latest
 
-Now you can reach the nginx service with a browser on the port `80`. In a second terminal you can now change the configuration file `/tmp/nginx/default.conf` and in the log (first terminal) within a few seconds the modified file `/etc/nginx/conf.d/default.conf` and the command `nginx -s reload` to be executed should be displayed, as well as the message from the nginx itself `signal process started`.
+Now you can reach the nginx service with a browser on the port `80`. In a second terminal you can now change the configuration file `/tmp/nginx/default.conf` and in the log (first terminal) within a few seconds the modified file `/etc/nginx/conf.d/default.conf` and the command `nginx -t && nginx -s reload` to be executed should be displayed, as well as the message from the nginx itself `signal process started`.
 
 
 ###  3.2. <a name='Customlogformat'></a>Custom log format 
@@ -74,7 +74,7 @@ Start the Docker container with activated and user-defined logging format.
 In the browser, go to the page `http://localhost/` and reload a few times, e.g. with pressing `F5`. Then the logs in the user-defined format can be seen in the console.
 
     [INFO] 2018-04-17T15:04:38+0000 Custom log format enabled
-    [INFO] 2018-04-17T15:04:38+0000 Starting observation for files '/etc/nginx/conf.d/default.conf' with command 'nginx -s reload'
+    [INFO] 2018-04-17T15:04:38+0000 Starting observation for files '/etc/nginx/conf.d/*.conf' with command 'nginx -t && nginx -s reload'
     Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:43 +0000] "GET / HTTP/1.1"
     Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:44 +0000] "GET / HTTP/1.1"
     Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:45 +0000] "GET / HTTP/1.1"
@@ -99,21 +99,21 @@ Enables (`true`) or disables (`false`) the monitoring of files. In combination w
 
 `OBSERVE_FILES`
 
-*default:* /etc/nginx/conf.d/default.conf
+*default:* /etc/nginx/conf.d/*.conf
 
-A list of files with absolute paths to monitor for change (based on the checksum). Both one and several files may be specified, these must be separated by a space.
+A list of files with absolute paths to monitor for change (based on the checksum). One-, several- and wildcard-files may be specified, these must be separated by a space.
 
 `OBSERVE_FILES_CREATE` 
 
 *default:* true
 
-Checks the list of files and creates files without content that does not exist.
+Checks the list of files and creates files without content that does not exist. Wildcard files will be ignored and only directory created.
 
 `OBSERVE_COMMAND` 
 
-*default:* nginx -s reload
+*default:* nginx -t && nginx -s reload
 
-The command to execute, if any of the submitted files changes.
+The command to execute, if any of the submitted files changed.
 
 `OBSERVE_INTERVAL`
 

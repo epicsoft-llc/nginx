@@ -8,9 +8,9 @@ LABEL image.name="epicsoft-nginx" \
       license="MIT"
 
 ENV OBSERVE_FILES_ENABLE=true \
-    OBSERVE_FILES="/etc/nginx/conf.d/default.conf" \
+    OBSERVE_FILES="/etc/nginx/conf.d/*.conf" \
     OBSERVE_FILES_CREATE=true \
-    OBSERVE_COMMAND="nginx -s reload" \
+    OBSERVE_COMMAND="nginx -t && nginx -s reload" \
     OBSERVE_INTERVAL=10 \
     NGINX_CUSTOM_LOGFORMAT_ENABLE=false \    
     NGINX_CUSTOM_LOGFORMAT='Custom log format - $remote_addr - $remote_user [$time_local] "$request"' \    
