@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 declare -r CUSTOM_NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 declare -r CUSTOM_SERVER_TOKENS_OFF="server_tokens off;"
