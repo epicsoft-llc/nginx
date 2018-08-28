@@ -163,6 +163,12 @@ Deletes the default web page configuration file `/etc/nginx/conf.d/default.conf`
 
 Toggles the debug message from epicsoft scripts on (`true`) or off (`false`).
 
+`NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE`
+
+*default:* *not set (used nginx default)*
+
+Parameter is set in 'http' context, description see [nginx documentation](http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_headers_hash_bucket_size).
+
 
 ##  5. <a name='Links'></a>Links
 
