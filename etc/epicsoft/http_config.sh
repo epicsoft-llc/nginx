@@ -9,6 +9,6 @@ if [[ $NGINX_CUSTOM_ADD_SERVER_TOKENS_OFF == true ]]; then
 fi
 
 if [[ $NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE != '' ]]; then 
-  echo "[INFO] $(date -Iseconds) Add 'server_names_hash_bucket_size $NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE;' to nginx configuration"
-  sed -i.bak -e "s/http\s\{1,\}{/http {\n    server_names_hash_bucket_size $NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE;\n/g" $CUSTOM_NGINX_CONFIG_FILE
+  echo "[INFO] $(date -Iseconds) Add 'proxy_headers_hash_bucket_size $NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE;' to nginx configuration"
+  sed -i.bak -e "s/http\s\{1,\}{/http {\n    proxy_headers_hash_bucket_size $NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE;\n/g" $CUSTOM_NGINX_CONFIG_FILE
 fi
