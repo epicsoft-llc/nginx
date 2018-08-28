@@ -84,6 +84,7 @@ DockerHubLatest:
   stage: latest
   script:
     - export DOCKER_HUB_IMAGE="epicsoft/nginx"
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASS
     - docker pull $CI_REGISTRY_IMAGE:alpine
     - docker tag $CI_REGISTRY_IMAGE:alpine $DOCKER_HUB_IMAGE:latest
     - docker push $DOCKER_HUB_IMAGE:latest
