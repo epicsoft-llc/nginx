@@ -7,8 +7,8 @@ declare -r CUSTOM_NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 #### Default configration 
 bash /etc/epicsoft/default_conf.sh
 
-#### Add 'server_tokens off;'
-bash /etc/epicsoft/server_tokens.sh
+#### Update http config 
+bash /etc/epicsoft/http_config.sh
 
 #### Add additional include directory
 bash /etc/epicsoft/direct_include.sh
