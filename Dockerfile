@@ -4,7 +4,7 @@ LABEL image.name="epicsoft-nginx" \
       image.description="Nginx with automatic reload on file/configuration change" \
       maintainer="epicsoft.de" \
       maintainer.name="Alexander Schwarz <schwarz@epicsoft.de>" \
-      maintainer.copyright="Copyright 2018 epicsoft.de / Alexander Schwarz" \
+      maintainer.copyright="Copyright 2018-2022 epicsoft.de / Alexander Schwarz" \
       license="MIT"
 
 ENV OBSERVE_FILES_ENABLE=true \

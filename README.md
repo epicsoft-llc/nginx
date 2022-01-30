@@ -48,15 +48,19 @@ If you need a different version, you may copy and modify my templates as needed.
 
 Create your own configuration or copy it from the existing docker image.
 
-    mkdir -p /tmp/nginx
-    docker run --rm -it --entrypoint "" registry.gitlab.com/epicdocker/nginx:latest cat /etc/nginx/conf.d/default.conf > /tmp/nginx/default.conf
+```bash
+mkdir -p /tmp/nginx
+docker run --rm -it --entrypoint "" registry.gitlab.com/epicdocker/nginx:latest cat /etc/nginx/conf.d/default.conf > /tmp/nginx/default.conf
+```
 
 Start the container and mount your configuration from the host. In this example, the container blocks the terminal and displays the log.
 
-    docker run --rm -it --name nginx \
-	  -v /tmp/nginx:/etc/nginx/conf.d:ro \
-	  -p 80:80 \
+```bash
+docker run --rm -it --name nginx \
+	-v /tmp/nginx:/etc/nginx/conf.d:ro \
+	-p 80:80 \
 	  registry.gitlab.com/epicdocker/nginx:latest
+```
 
 Now you can reach the nginx service with a browser on the port `80`. In a second terminal you can now change the configuration file `/tmp/nginx/default.conf` and in the log (first terminal) within a few seconds the modified file `/etc/nginx/conf.d/default.conf` and the command `nginx -t && nginx -s reload` to be executed should be displayed, as well as the message from the nginx itself `signal process started`.
 
@@ -65,19 +69,23 @@ Now you can reach the nginx service with a browser on the port `80`. In a second
 
 Start the Docker container with activated and user-defined logging format.
 
-    docker run --rm -it --name nginx \
-	  -e NGINX_CUSTOM_LOGFORMAT_ENABLE=true \
-	  -e NGINX_CUSTOM_LOGFORMAT='Example log format - $remote_addr - $remote_user [$time_local] "$request"' \
-	  -p 80:80 \
+```bash
+docker run --rm -it --name nginx \
+	-e NGINX_CUSTOM_LOGFORMAT_ENABLE=true \
+	-e NGINX_CUSTOM_LOGFORMAT='Example log format - $remote_addr - $remote_user [$time_local] "$request"' \
+	-p 80:80 \
 	  registry.gitlab.com/epicdocker/nginx:latest
+```
 
 In the browser, go to the page `http://localhost/` and reload a few times, e.g. with pressing `F5`. Then the logs in the user-defined format can be seen in the console.
 
-    [INFO] 2018-04-17T15:04:38+0000 Custom log format enabled
-    [INFO] 2018-04-17T15:04:38+0000 Starting observation for files '/etc/nginx/conf.d/*.conf' with command 'nginx -t && nginx -s reload'
-    Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:43 +0000] "GET / HTTP/1.1"
-    Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:44 +0000] "GET / HTTP/1.1"
-    Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:45 +0000] "GET / HTTP/1.1"
+```bash
+[INFO] 2018-04-17T15:04:38+0000 Custom log format enabled
+[INFO] 2018-04-17T15:04:38+0000 Starting observation for files '/etc/nginx/conf.d/*.conf' with command 'nginx -t && nginx -s reload'
+Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:43 +0000] "GET / HTTP/1.1"
+Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:44 +0000] "GET / HTTP/1.1"
+Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:45 +0000] "GET / HTTP/1.1"
+```
 
 Stop the container by pressing `Ctrl + C`.
 
@@ -86,8 +94,10 @@ Stop the container by pressing `Ctrl + C`.
 
 The following format can be used for the proxy protocol. Logging format taken from the [nginx documentation](https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol/).
 
-    NGINX_CUSTOM_LOGFORMAT='$proxy_protocol_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
-	
+```bash
+NGINX_CUSTOM_LOGFORMAT='$proxy_protocol_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
+```
+
 
 ##  4. <a name='Environments'></a>Environments
 
