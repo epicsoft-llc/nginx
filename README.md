@@ -38,7 +38,7 @@ If you need a different version, you may copy and modify my templates as needed.
 
 ##  2. <a name='Requirements'></a>Requirements
 
-- Docker installed - https://www.docker.com/get-docker
+- Docker installed - https://www.docker.com/get-started
 
 
 ##  3. <a name='Examples'></a>Examples
