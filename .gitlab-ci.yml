@@ -22,7 +22,7 @@ Build:
     - docker build --pull --no-cache -t $CI_REGISTRY_IMAGE:stable-alpine --build-arg VERSION=stable-alpine .
     - docker push $CI_REGISTRY_IMAGE:alpine
     - docker push $CI_REGISTRY_IMAGE:stable-alpine
-    - docker tag $CI_REGISTRY_IMAGE:alpine $DOCKER_HUB_IMAGE:latest
+    - docker tag $CI_REGISTRY_IMAGE:alpine $CI_REGISTRY_IMAGE:latest
     - docker push $CI_REGISTRY_IMAGE:latest
   only:
     - master
