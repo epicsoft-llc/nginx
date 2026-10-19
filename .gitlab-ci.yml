@@ -7,43 +7,139 @@ image: docker:latest
 services:
   - docker:dind
 
+#### Multi-platform builds need a runner host with QEMU binfmt handlers registered
+default:
+  tags:
+    - imagex
+
+variables:
+  DOCKER_REGISTRY: "epicsoft/nginx"
+  BUILD_PLATFORMS: "linux/amd64,linux/arm64"
+  BUILDX_NO_DEFAULT_ATTESTATIONS: "1"
+
+#### The tokens go in over stdin: '-p' would put them in the process list of the runner.
+before_script:
+  - echo "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
+  - echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USER" --password-stdin
+
 after_script:
-  - docker logout
   - docker logout $CI_REGISTRY
+  - docker logout
 
-Build:
+#### Publishing happens from the default branch and from the weekly schedule, nowhere else.
+.rulesPublish: &rulesPublish
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+#### One job per nginx line: VERSION is the published tag, EXTRA_TAGS further names, NGINX_TAG the official tag below.
+#### Each platform is built, loaded and put through test/smoke.sh before the push; buildx reaches dind through a context.
+.build:
   stage: build
-  variables:
-    GIT_STRATEGY: clone
-  before_script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+  retry: 2
+  rules: *rulesPublish
   script:
-    - docker build --pull --no-cache -t $CI_REGISTRY_IMAGE:alpine --build-arg VERSION=alpine .
-    - docker build --pull --no-cache -t $CI_REGISTRY_IMAGE:stable-alpine --build-arg VERSION=stable-alpine .
-    - docker push $CI_REGISTRY_IMAGE:alpine
-    - docker push $CI_REGISTRY_IMAGE:stable-alpine
-    - docker tag $CI_REGISTRY_IMAGE:alpine $CI_REGISTRY_IMAGE:latest
-    - docker push $CI_REGISTRY_IMAGE:latest
-  only:
-    - master
+    - echo "Build nginx Docker image '${VERSION}' on nginx:${NGINX_TAG}"
+    - docker context create dind
+    - docker buildx create --name epicbuilder --driver docker-container --use dind
+    - BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+    - docker run --rm --entrypoint nginx "nginx:${NGINX_TAG}" -v
+    - |
+      for platform in $(echo "${BUILD_PLATFORMS}" | tr ',' ' '); do
+        docker buildx build . --load --pull --no-cache --platform "${platform}" -t nginx:test \
+          --build-arg NGINX_TAG="${NGINX_TAG}" --build-arg IMAGE_TAG="${VERSION}" --build-arg BUILD_DATE="${BUILD_DATE}"
+        sh test/smoke.sh nginx:test "${platform}"
+      done
+    - |
+      TAGS=""
+      for tag in ${VERSION} ${EXTRA_TAGS}; do
+        TAGS="${TAGS} -t ${CI_REGISTRY_IMAGE}:${tag} -t ${DOCKER_REGISTRY}:${tag}"
+      done
+    - docker buildx build . --push --pull --platform ${BUILD_PLATFORMS} ${TAGS}
+        --build-arg NGINX_TAG=${NGINX_TAG} --build-arg IMAGE_TAG=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE}
 
-DockerHub:
-  stage: release
+nginxLatest:
+  extends: .build
   variables:
-    GIT_STRATEGY: none
-    DOCKER_HUB_IMAGE: "epicsoft/nginx"
-  before_script:
-    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASS
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    VERSION: "latest"
+    EXTRA_TAGS: "alpine"
+    NGINX_TAG: "alpine"
+
+nginxStable:
+  extends: .build
+  variables:
+    VERSION: "stable-alpine"
+    NGINX_TAG: "stable-alpine"
+
+uploadReadme:
+  stage: release
+  retry: 2
+  rules: *rulesPublish
   script:
-    - docker pull $CI_REGISTRY_IMAGE:alpine
-    - docker pull $CI_REGISTRY_IMAGE:latest
-    - docker pull $CI_REGISTRY_IMAGE:stable-alpine
-    - docker tag $CI_REGISTRY_IMAGE:alpine $DOCKER_HUB_IMAGE:alpine
-    - docker tag $CI_REGISTRY_IMAGE:latest $DOCKER_HUB_IMAGE:latest
-    - docker tag $CI_REGISTRY_IMAGE:stable-alpine $DOCKER_HUB_IMAGE:stable-alpine
-    - docker push $DOCKER_HUB_IMAGE:alpine
-    - docker push $DOCKER_HUB_IMAGE:latest
-    - docker push $DOCKER_HUB_IMAGE:stable-alpine
-  only:
-    - master
+    #### Docker Hub takes at most 25,000 characters - counted in bytes here, which is stricter
+    - |
+      size=$(wc -c < README.md)
+      if [ "$size" -gt 25000 ]; then
+        echo "README.md has $size bytes, Docker Hub takes 25000"
+        exit 1
+      fi
+    #### '-e NAME' without a value reads it from the environment, so the token stays out of the process list
+    - DOCKERHUB_PASSWORD="$DOCKER_HUB_TOKEN" docker run --rm -v $PWD:/workspace
+      -e DOCKERHUB_USERNAME=${DOCKER_HUB_USER}
+      -e DOCKERHUB_PASSWORD
+      -e DOCKERHUB_REPOSITORY=${DOCKER_REGISTRY}
+      -e SHORT_DESCRIPTION="Official nginx image with automatic graceful reload on config change and a reload-aware healthcheck"
+      -e README_FILEPATH='/workspace/README.md'
+        peterevans/dockerhub-description:4
+
+#### A git tag is the date of a CHANGELOG.md entry; its pipeline only turns that entry into the GitHub release
+github-release:
+  stage: release
+  image: epicsoft/ci:latest
+  services: []
+  before_script: []
+  after_script: []
+  needs: []
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^\d{4}-\d{2}-\d{2}$/
+  variables:
+    GITHUB_REPO: "epicsoft-llc/${CI_PROJECT_NAME}"
+  script:
+    - |
+      if [ -z "${GITHUB_TOKEN:-}" ]; then
+        echo "GITHUB_TOKEN is empty - it is a protected variable, so the tag has to be protected"
+        exit 1
+      fi
+      api="https://api.github.com/repos/${GITHUB_REPO}"
+      #### curl reads the header from a file, so the token stays out of the process list
+      auth_file=$(mktemp)
+      printf 'Authorization: Bearer %s\n' "${GITHUB_TOKEN}" > "$auth_file"
+      auth="@$auth_file"
+      #### the lines below '## <date>' up to the next entry or the next '---', without the blank lines around them
+      notes=$(awk -v head="## ${CI_COMMIT_TAG}" '
+        $0 == head { found = 1; next }
+        found && (/^## / || $0 == "---") { exit }
+        found { line[++n] = $0 }
+        END {
+          while (n > 0 && line[n] ~ /^[[:space:]]*$/) n--
+          for (i = 1; i <= n; i++) if (started || line[i] !~ /^[[:space:]]*$/) { started = 1; print line[i] }
+        }' CHANGELOG.md)
+      if [ -z "$notes" ]; then
+        echo "CHANGELOG.md has no entry for ${CI_COMMIT_TAG}"
+        exit 1
+      fi
+      if curl -sf -H "$auth" "$api/releases/tags/${CI_COMMIT_TAG}" > /dev/null; then
+        echo "Release ${CI_COMMIT_TAG} already exists on GitHub"
+        exit 0
+      fi
+      tries=0
+      until curl -sf -H "$auth" "$api/git/ref/tags/${CI_COMMIT_TAG}" > /dev/null; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 60 ]; then
+          echo "Tag ${CI_COMMIT_TAG} did not reach GitHub within 10 minutes - check the push mirror"
+          exit 1
+        fi
+        sleep 10
+      done
+      jq -n --arg tag "${CI_COMMIT_TAG}" --arg body "$notes" '{tag_name: $tag, name: $tag, body: $body}' \
+        | curl -sS --fail-with-body -X POST -H "$auth" -H "Accept: application/vnd.github+json" "$api/releases" -d @- > /dev/null
+      echo "Release ${CI_COMMIT_TAG} created on GitHub"

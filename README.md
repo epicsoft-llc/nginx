@@ -1,191 +1,169 @@
-<!-- vscode-markdown-toc -->
-* 1. [Versions](#Versions)
-* 2. [Requirements](#Requirements)
-* 3. [Examples](#Examples)
-	* 3.1. [Change configuration file](#Changeconfigurationfile)
-	* 3.2. [Custom log format](#Customlogformat)
-	* 3.3. [Log format for 'proxy_protocol'](#Logformatforproxy_protocol)
-* 4. [Environments](#Environments)
-* 5. [Links](#Links)
-* 6. [License](#License)
+# nginx
 
-<!-- vscode-markdown-toc-config
-	numbering=true
-	autoSave=true
-	/vscode-markdown-toc-config -->
-<!-- /vscode-markdown-toc -->
+This Docker image is managed and kept up to date by [epicsoft LLC](https://epicsoft.one).
 
+The official [nginx image](https://hub.docker.com/_/nginx) with what it leaves to you: the configuration is reloaded
+**automatically and gracefully** when it changes, `nginx-reload` tells you whether a reload worked, and the
+**healthcheck turns unhealthy when a reload failed** - instead of nginx silently serving the old configuration.
 
-# Nginx with automatic reload 
+* Base image: https://hub.docker.com/_/nginx (`alpine` variants), platforms `linux/amd64` and `linux/arm64`
+* Dockerfile: https://gitlab.com/epicsoft-networks/nginx/-/blob/master/Dockerfile
+* Repository: https://gitlab.com/epicsoft-networks/nginx, mirrored to [GitHub](https://github.com/epicsoft-llc/nginx) — issues are welcome on both; code changes only as merge requests on GitLab, the mirror overwrites anything pushed to GitHub
+* Container registry: https://gitlab.com/epicsoft-networks/nginx/container_registry
+* Docker Hub: https://hub.docker.com/r/epicsoft/nginx
+* Changelog: https://gitlab.com/epicsoft-networks/nginx/-/blob/master/CHANGELOG.md
+* License: MIT
 
-Nginx with automatic reload on file/configuration change.
+## What this image adds
 
-The image extends the official [nginx](https://hub.docker.com/_/nginx/) image by a bash-script that detects changes based on the checksum and thus provides a way to reload nginx without restarting the conteiner or service.
+| | official image | this image |
+|---|---|---|
+| Configuration changed | nothing happens until you run `nginx -s reload` or send a `SIGHUP` | checked with `nginx -t` and reloaded automatically - gracefully, the old workers finish their connections |
+| Broken configuration | the reload fails, nginx keeps the old configuration and nothing outside shows it | the reload is refused with nginx's own error messages, and the container turns **unhealthy** |
+| Reload from a script | `nginx -s reload` - no answer whether it worked | `docker exec <container> nginx-reload` - nginx's messages and an exit code |
+| Healthcheck | none | master and workers run, the control API answers, no failed reload |
 
-The image offers the possibility to change the standard logging format and thus to choose a user-defined format, e.g. to access other variables when using the proxy protocol. This overwrites the default parameter `access_log` and uses the custom logging format.
+Everything else is the official image as it is: nginx and its modules - the ACME module included -, templates with
+environment variables, the scripts in `/docker-entrypoint.d/`, logging to the container log.
 
-The information about changes to files is not passed on to the container by the host, therefore checksums are created by the files and checked for changes in the interval. In case of a faulty nginx configuration, the application and the bash-script will continue, so that the error can be corrected without container restart.
+## Versions
 
+The tags follow the nginx lines of the official image and are rebuilt weekly, so each one keeps getting the newest
+nginx release of its line.
 
-##  1. <a name='Versions'></a>Versions
+| Tag | Built on |
+|---|---|
+| `latest`, `alpine` | `nginx:alpine` - mainline, the line with the newest features and fixes |
+| `stable-alpine` | `nginx:stable-alpine` - stable |
 
-There is no versioning of this project, the current versions of `stable-alpine` and `alpine` (`latest`) are being built weekly.
-
-If you need a different version, you may copy and modify my templates as needed.
-
-`stable-alpine` `alpine` `latest` [Dockerfile](https://gitlab.com/epicdocker/nginx/blob/master/Dockerfile)
-
-
-##  2. <a name='Requirements'></a>Requirements
-
-- Docker installed - https://www.docker.com/get-started
-
-
-##  3. <a name='Examples'></a>Examples
-
-
-###  3.1. <a name='Changeconfigurationfile'></a>Change configuration file 
-
-Create your own configuration or copy it from the existing docker image.
+The nginx version an image really holds is written into it:
 
 ```bash
-mkdir -p /tmp/nginx
-docker run --rm -it --entrypoint "" registry.gitlab.com/epicdocker/nginx:latest cat /etc/nginx/conf.d/default.conf > /tmp/nginx/default.conf
+docker image inspect --format '{{index .Config.Labels "image.nginx.version"}}' epicsoft/nginx:stable-alpine
 ```
 
-Start the container and mount your configuration from the host. In this example, the container blocks the terminal and displays the log.
+**The answer whether a reload worked needs nginx 1.31.5 or newer**, which brought the control API: mainline has it,
+`stable-alpine` with nginx 1.30 gets it with the next stable line. Until then `stable-alpine` checks the configuration
+with `nginx -t` and reloads by signal - a configuration that passes the test but still fails to load, on a port that
+is in use for example, goes unnoticed there.
+
+## Quick start
+
+Mount the **directory** with the configuration, not a single file: editors and deployment tools usually replace a
+file instead of rewriting it, and a single-file mount keeps pointing at the old one.
 
 ```bash
-docker run --rm -it --name nginx \
-	-v /tmp/nginx:/etc/nginx/conf.d:ro \
-	-p 80:80 \
-	  registry.gitlab.com/epicdocker/nginx:latest
+docker run -d --name nginx \
+  -p 80:80 \
+  -v /srv/nginx/conf.d:/etc/nginx/conf.d:ro \
+  epicsoft/nginx:latest
 ```
 
-Now you can reach the nginx service with a browser on the port `80`. In a second terminal you can now change the configuration file `/tmp/nginx/default.conf` and in the log (first terminal) within a few seconds the modified file `/etc/nginx/conf.d/default.conf` and the command `nginx -t && nginx -s reload` to be executed should be displayed, as well as the message from the nginx itself `signal process started`.
+`/srv/nginx/conf.d/default.conf`, for example:
 
+```
+server {
+  listen 80;
+  server_name example.com;
 
-###  3.2. <a name='Customlogformat'></a>Custom log format 
+  location / {
+    proxy_pass http://app:8080;
+  }
+}
+```
 
-Start the Docker container with activated and user-defined logging format.
+A Compose example: [example/compose.yml](https://gitlab.com/epicsoft-networks/nginx/-/blob/master/example/compose.yml).
+
+## Reloading
+
+**Automatically:** every change below `/etc/nginx` - the default of `NGINX_WATCH` - is checked with `nginx -t` and
+then reloaded. inotify reports a change right away; where no events arrive, for example with a bind mount from
+Docker Desktop, a checksum compare every `NGINX_WATCH_INTERVAL` seconds catches it. Certificates kept outside
+`/etc/nginx` can be added to `NGINX_WATCH`, so a renewed certificate is loaded without a restart.
+
+```
+[nginx-watch] 2026-10-19T10:32:08+00:00 change found, reloading
+{"logs":[]}
+[nginx-reload] 2026-10-19T10:32:08+00:00 reload done
+```
+
+**By hand or from a deployment:** `nginx-reload` does the same and exits with `0` only when the new configuration
+runs - an Ansible handler or a CI job can rely on it.
 
 ```bash
-docker run --rm -it --name nginx \
-	-e NGINX_CUSTOM_LOGFORMAT_ENABLE=true \
-	-e NGINX_CUSTOM_LOGFORMAT='Example log format - $remote_addr - $remote_user [$time_local] "$request"' \
-	-p 80:80 \
-	  registry.gitlab.com/epicdocker/nginx:latest
+docker exec nginx nginx-reload
 ```
 
-In the browser, go to the page `http://localhost/` and reload a few times, e.g. with pressing `F5`. Then the logs in the user-defined format can be seen in the console.
+A broken configuration never takes nginx down: the reload is refused with nginx's message, nginx keeps serving the
+previous configuration, and the container is unhealthy until a reload succeeds.
+
+```
+[nginx-reload] 2026-10-19T10:31:17+00:00 configuration invalid, nginx keeps running the previous one:
+nginx: [emerg] unknown directive "not-a-directive" in /etc/nginx/conf.d/default.conf:46
+nginx: configuration file /etc/nginx/nginx.conf test failed
+```
+
+**By signal:** `nginx -s reload` and `docker kill -s HUP nginx` work as in the official image - but neither nginx nor
+the healthcheck tells whether a reload sent this way worked.
+
+## Healthcheck
+
+The image checks every 30 seconds:
+
+- the nginx master and its workers run,
+- the control API answers, where nginx has one,
+- the last reload did not fail.
+
+The reason for an unhealthy container is in `docker inspect`:
 
 ```bash
-[INFO] 2018-04-17T15:04:38+0000 Custom log format enabled
-[INFO] 2018-04-17T15:04:38+0000 Starting observation for files '/etc/nginx/conf.d/*.conf' with command 'nginx -t && nginx -s reload'
-Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:43 +0000] "GET / HTTP/1.1"
-Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:44 +0000] "GET / HTTP/1.1"
-Example log format - 172.17.0.1 - - [17/Apr/2018:15:08:45 +0000] "GET / HTTP/1.1"
+docker inspect --format '{{json .State.Health}}' nginx
 ```
 
-Stop the container by pressing `Ctrl + C`.
+## Environment variables
 
+| Variable | Default | Meaning |
+|---|---|---|
+| `NGINX_WATCH` | `/etc/nginx` | files and directories, separated by spaces, whose changes trigger a reload; empty turns the automatic reload off |
+| `NGINX_WATCH_INTERVAL` | `5` | seconds between the checksum compares that catch changes without inotify events |
+| `NGINX_CONTROL_SOCKET` | `/var/run/nginx-control.sock` | socket of the nginx control API, opened at the start where nginx has one |
+| `NGINX_RELOAD_WEBHOOK_SUCCESS_URL` | *empty* | URL called (GET) after a successful reload by `nginx-reload` |
+| `NGINX_RELOAD_WEBHOOK_FAILURE_URL` | *empty* | URL called (GET) after a refused or failed reload |
 
-###  3.3. <a name='Logformatforproxy_protocol'></a>Log format for 'proxy_protocol'
+The variables of the official image - `NGINX_ENVSUBST_*`, `NGINX_ENTRYPOINT_*` - work as there.
 
-The following format can be used for the proxy protocol. Logging format taken from the [nginx documentation](https://docs.nginx.com/nginx/admin-guide/load-balancer/using-proxy-protocol/).
+## Migrating from the earlier image
 
-```bash
-NGINX_CUSTOM_LOGFORMAT='$proxy_protocol_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
-```
+Until 2026-10 this image compared the checksums of `/etc/nginx/conf.d/*.conf` every ten seconds, ran
+`nginx -t && nginx -s reload` without telling whether it worked, and edited `nginx.conf` through environment
+variables. The watcher now covers all of `/etc/nginx`, and those settings belong into your own configuration:
 
+| Earlier variable | Now |
+|---|---|
+| `OBSERVE_FILES_ENABLE=false` | `NGINX_WATCH=` (empty) |
+| `OBSERVE_FILES` | `NGINX_WATCH` - files and directories instead of wildcards |
+| `OBSERVE_INTERVAL` | `NGINX_WATCH_INTERVAL` |
+| `OBSERVE_COMMAND` | removed - the reload is `nginx-reload`, the webhooks report its result |
+| `OBSERVE_FILES_CREATE` | removed - mount the directory |
+| `NGINX_CUSTOM_ADD_SERVER_TOKENS_OFF=true` | `server_tokens off;` in a file in `conf.d` |
+| `NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE` | `proxy_headers_hash_bucket_size ...;` in a file in `conf.d` |
+| `NGINX_CUSTOM_LOGFORMAT_*` | `log_format` in a file in `conf.d`, and `access_log /var/log/nginx/access.log <name>;` in the `server` block |
+| `NGINX_CUSTOM_ADD_DIRECT_INCLUDE=true` | your own `/etc/nginx/nginx.conf`, with the `stream` block or the include you need |
+| `NGINX_CUSTOM_DELETE_DEFAULT_CONF=true` | mount your own `conf.d` - it replaces `default.conf` |
+| `EPICSOFT_LOG_LEVEL_DEBUG` | removed |
 
-##  4. <a name='Environments'></a>Environments
+bash is not part of the image any more - the scripts are POSIX `sh`. `registry.gitlab.com/epicdocker/nginx` is gone;
+Docker Hub `epicsoft/nginx` stays as it is.
 
-`OBSERVE_FILES_ENABLE`
+## Reporting problems
 
-*default:* true
+Issues are welcome on [GitLab](https://gitlab.com/epicsoft-networks/nginx/-/issues) and
+[GitHub](https://github.com/epicsoft-llc/nginx/issues). Please report a security problem as a
+**confidential issue** on GitLab instead of a public one.
 
-Enables (`true`) or disables (`false`) the monitoring of files. In combination with `NGINX_CUSTOM_DELETE_DEFAULT_CONF`, it should probably be turned off unless other file is to be monitored.
+## License
 
-`OBSERVE_FILES`
+[MIT](https://gitlab.com/epicsoft-networks/nginx/-/blob/master/LICENSE) — Copyright (c) 2018-2026 epicsoft LLC / Alexander Schwarz
 
-*default:* /etc/nginx/conf.d/*.conf
-
-A list of files with absolute paths to monitor for change (based on the checksum). One-, several- and wildcard-files may be specified, these must be separated by a space.
-
-`OBSERVE_FILES_CREATE` 
-
-*default:* true
-
-Checks the list of files and creates files without content that does not exist. Wildcard files will be ignored and only directory created.
-
-`OBSERVE_COMMAND` 
-
-*default:* nginx -t && nginx -s reload
-
-The command to execute, if any of the submitted files changed.
-
-`OBSERVE_INTERVAL`
-
-*default:* 10
-
-Interval in seconds, in which the changes are checked.
-
-`NGINX_CUSTOM_LOGFORMAT_ENABLE`
-
-*default:* false
-
-General switch on (`true`) or off (`false`) the user-defined logging format functionality.
-
-`NGINX_CUSTOM_LOGFORMAT`
-
-*default:* `'Custom log format - $remote_addr - $remote_user [$time_local] "$request"'`
-
-The content of the nginx logging format. 
-
-`NGINX_CUSTOM_LOGFORMAT_NAME`
-
-*default:* custom
-
-Name given to the logging format. `main` is already reserved and must not be used.
-
-`NGINX_CUSTOM_ADD_SERVER_TOKENS_OFF`
-
-*default:* false
-
-Prevents sending the nginx version number in response. Adds the parameter `server_tokens off` to the nginx configuration directly in the HTTP context at the highest configuration level. This is valid for all website configurations. 
-
-`NGINX_CUSTOM_ADD_DIRECT_INCLUDE`
-
-*default:* false
-
-Adds an additional include path to the configuration `/etc/nginx/inc.d/`, which is outside the HTTP context. This setting is required if you want to configure stream(s), as they can not be included in the HTTP context. The configuration file must have the suffix `.conf` to be included.
-
-`NGINX_CUSTOM_DELETE_DEFAULT_CONF`
-
-*default:* false
-
-Deletes the default web page configuration file `/etc/nginx/conf.d/default.conf`. This setting is mainly needed if you use only the alternate include path of configuration file, see `NGINX_CUSTOM_ADD_DIRECT_INCLUDE`. If no custom file is being monitored, `OBSERVE_FILES_ENABLE` should be disabled.
-
-`EPICSOFT_LOG_LEVEL_DEBUG`
-
-*default:* false
-
-Toggles the debug message from epicsoft scripts on (`true`) or off (`false`).
-
-`NGINX_CUSTOM_PROXY_HEADERS_HASH_BUCKET_SIZE`
-
-*default:* *not set (used nginx default)*
-
-Parameter is set in 'http' context, description see [nginx documentation](http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_headers_hash_bucket_size).
-
-
-##  5. <a name='Links'></a>Links
-
-- https://gitlab.com/epicdocker/nginx
-- https://hub.docker.com/_/nginx/
-
-
-##  6. <a name='License'></a>License
-
-MIT License see [LICENSE](https://gitlab.com/epicdocker/nginx/blob/master/LICENSE)
+The MIT license applies only to files created by epicsoft LLC. Third-party software in the image — nginx, the
+Alpine packages and the official `nginx` image — remains under its own licenses.

@@ -1,0 +1,16 @@
+#!/bin/sh
+#### Starts nginx through the official entrypoint, with the control socket where nginx has one (1.31.5 and newer)
+
+set -e
+
+if [ "$1" = "nginx" ] || [ "$1" = "nginx-debug" ]; then
+  if "$1" -h 2>&1 | grep -q -e '-l addr'; then
+    #### a socket left from an earlier start of this container would block the new one
+    rm -f "${NGINX_CONTROL_SOCKET}"
+    BIN="$1"
+    shift
+    set -- "${BIN}" -l "unix:${NGINX_CONTROL_SOCKET}" "$@"
+  fi
+fi
+
+exec /docker-entrypoint.sh "$@"

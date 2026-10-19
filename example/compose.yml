@@ -1,0 +1,10 @@
+#### docker compose up, then http://localhost:8080 - edit conf.d/default.conf and the change is live within seconds
+services:
+
+  nginx:
+    image: epicsoft/nginx:latest
+    volumes:
+      #### the directory, not the file - a replaced file would not be seen through a single-file mount
+      - ./conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "8080:80"

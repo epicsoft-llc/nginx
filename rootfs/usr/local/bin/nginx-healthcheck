@@ -1,0 +1,29 @@
+#!/bin/sh
+#### Healthy means: master and workers run, the control API answers and the last reload did not fail
+
+readonly STATE_FILE="${NGINX_STATE_FILE:-/var/run/nginx-reload.state}"
+
+if ! pgrep -f 'nginx: master process' > /dev/null; then
+  echo "no nginx master process"
+  exit 1
+fi
+if ! pgrep -f 'nginx: worker process' > /dev/null; then
+  echo "no nginx worker process"
+  exit 1
+fi
+if [ -S "${NGINX_CONTROL_SOCKET}" ] && ! curl -s -f -o /dev/null --max-time 5 --unix-socket "${NGINX_CONTROL_SOCKET}" http://localhost/1/; then
+  echo "the control API does not answer"
+  exit 1
+fi
+
+STATE=""
+if [ -f "${STATE_FILE}" ]; then
+  read -r STATE _ < "${STATE_FILE}"
+fi
+#### after a failed reload nginx serves an older configuration than the one on disk
+if [ "${STATE}" = "failed" ]; then
+  echo "the last reload failed - nginx keeps serving the previous configuration"
+  exit 1
+fi
+
+echo "ok"

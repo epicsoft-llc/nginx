@@ -1,0 +1,25 @@
+#!/bin/sh
+#### Reloads nginx when a file below NGINX_WATCH changes - inotify right away, the checksum compare where none arrive
+
+checksum() {
+  find ${NGINX_WATCH} -type f -exec sha256sum {} + 2>/dev/null | sort | sha256sum # ok: unquoted, a list of paths
+}
+
+#### taken before nginx starts, so a change during its start is reloaded once it runs
+LAST=$(checksum)
+until pgrep -f 'nginx: master process' > /dev/null; do
+  sleep 1
+done
+
+echo "[nginx-watch] $(date -Iseconds) watching ${NGINX_WATCH}"
+while true; do
+  #### let an editor or a deployment finish writing before the configuration is read
+  sleep 1
+  CURRENT=$(checksum)
+  if [ "${CURRENT}" != "${LAST}" ]; then
+    LAST=${CURRENT}
+    echo "[nginx-watch] $(date -Iseconds) change found, reloading"
+    nginx-reload || true
+  fi
+  inotifywait -q -q -r -t "${NGINX_WATCH_INTERVAL}" -e close_write,create,delete,move ${NGINX_WATCH} || true # ok: list
+done
