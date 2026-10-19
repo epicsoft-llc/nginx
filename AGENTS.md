@@ -5,7 +5,7 @@ Guidance for AI coding agents and contributors working in this repository.
 ## What this repository is
 
 A thin layer on top of the official `nginx` image (published as `epicsoft/nginx`). It adds one thing the official
-image leaves to the user, done properly: reloading the configuration. Four shell scripts under `rootfs/` are the
+image leaves to the user, done properly: reloading the configuration. The shell scripts under `rootfs/` are the
 product; the rest is the Dockerfile, the pipeline, the smoke test and documentation. `README.md` is the published
 Docker Hub description and is uploaded by the pipeline, so it is part of the release artifact, not just documentation.
 
@@ -46,9 +46,12 @@ container log. Do not re-add what nginx or the official image do themselves.
   control API with `PATCH /1/control/config`, which answers once the new workers run: `200`, or `422` with nginx's
   messages. Without the control API it sends `nginx -s reload`, and nginx does not answer. It writes
   `ok|failed <epoch>` to `/var/run/nginx-reload.state` and calls the optional webhooks.
-- **`nginx-healthcheck`** looks for the master and worker processes, asks `GET /1/` on the control socket where there
-  is one, and reads the state file: unhealthy when the last reload failed, because nginx then keeps serving the
+- **`nginx-healthcheck`** asks `nginx-master` for a master with workers, asks `GET /1/` on the control socket where
+  there is one, and reads the state file: unhealthy when the last reload failed, because nginx then keeps serving the
   previous configuration. A reload sent past `nginx-reload` - `nginx -s reload`, `SIGHUP` - is not seen.
+- **`nginx-master`** finds the master by command name and parent: the nginx process with nginx children whose own
+  parent is no nginx. Never by process title - `nginx: master process` does not show under QEMU emulation, which runs
+  the `linux/arm64` smoke test in the pipeline. The watcher uses it as well, to wait for nginx before its first reload.
 
 ## Tests
 

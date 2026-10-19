@@ -54,7 +54,7 @@ waitFor "healthcheck is healthy after the start" nginx-healthcheck
 if docker exec "${NAME}" sh -c 'nginx -h 2>&1 | grep -q -e "-l addr"'; then
   waitFor "the control API is open" sh -c 'curl -s -f --unix-socket "${NGINX_CONTROL_SOCKET}" http://localhost/1/'
 else
-  echo "ok: nginx $(docker exec "${NAME}" sh -c 'echo "${NGINX_VERSION}"') has no control API, the reload goes by signal"
+  echo "ok: nginx $(docker exec "${NAME}" sh -c 'echo "${NGINX_VERSION}"') has no control API, it reloads by signal"
 fi
 
 docker exec "${NAME}" sed -i 's/smoke-before/smoke-after/' "${CONFIG}"

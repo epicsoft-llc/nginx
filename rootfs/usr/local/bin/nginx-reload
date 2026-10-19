@@ -33,7 +33,8 @@ fi
 
 if [ -S "${NGINX_CONTROL_SOCKET}" ]; then
   #### the control API answers once the new workers run: 200, or 422 with nginx's messages
-  RESULT=$(curl -s -w '\n%{http_code}' --max-time 60 --unix-socket "${NGINX_CONTROL_SOCKET}" -X PATCH http://localhost/1/control/config)
+  RESULT=$(curl -s -w '\n%{http_code}' --max-time 60 --unix-socket "${NGINX_CONTROL_SOCKET}" \
+    -X PATCH http://localhost/1/control/config)
   CODE=$(echo "${RESULT}" | tail -n 1)
   echo "${RESULT}" | sed '$d'
   if [ "${CODE}" = "200" ]; then
