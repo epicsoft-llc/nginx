@@ -16,6 +16,28 @@ New nginx releases from the weekly build are summed up once a quarter, a fix rat
 
 ---
 
+## 2026-11-19
+
+nginx 1.31.9 and 1.30.7 fix three issues rated major, so they get their entry right away instead of the quarterly
+summary. The images were rebuilt on 2026-11-19 and hold them in every tag.
+
+### Security
+
+- **nginx 1.31.9 and 1.30.7** fix three issues rated major by nginx: CVE-2026-123007 (memory corruption in HTTP/2 flow
+  control), CVE-2026-118899 (infinite loop while reading a client request body over TLS 1.3) and CVE-2026-113425
+  (use-after-free in the mail proxy module). Rated medium: CVE-2026-123634 (use-after-free in the resolver),
+  CVE-2026-123633 (use-after-free in HTTP/2), CVE-2026-121810 (use-after-free in HTTP/3) and CVE-2026-120967 (SNI
+  bypass with client certificate validation in stream); rated minor: CVE-2026-125283, CVE-2026-123640 and, in 1.31.9
+  only, CVE-2026-120993.
+- OpenSSL `3.5.9-r1` with the security patches Alpine added on 2026-11-18, and Alpine `3.24.4`.
+
+### Changed
+
+- **The versions in the images** after the rebuild of 2026-11-19: nginx 1.31.9 in `latest` and `alpine`, nginx 1.30.7
+  in `stable-alpine`.
+
+---
+
 ## 2026-10-19
 
 Rebuilt on top of the official image: a change is checked before it is loaded, the reload reports whether it worked,
